@@ -1,0 +1,632 @@
+local Fluent = loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
+local SaveManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/SaveManager.lua"))()
+local InterfaceManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/dawid-scripts/Fluent/master/Addons/InterfaceManager.lua"))()
+
+local Window = Fluent:CreateWindow({
+    Title = "Sun Hub",
+    SubTitle = "by NovaTeam",
+    TabWidth = 160,
+    Size = UDim2.fromOffset(580, 460),
+    Acrylic = true,
+    Theme = "Dark",
+    MinimizeKey = Enum.KeyCode.LeftControl
+})
+
+local Tabs = {
+    Combat = Window:AddTab({ Title = "Combat", Icon = "crosshair" }),
+    Player = Window:AddTab({ Title = "Player", Icon = "user" }),
+    Teleport = Window:AddTab({ Title = "Teleport", Icon = "map-pin" }),
+    AutoFarm = Window:AddTab({ Title = "Auto Farm", Icon = "zap" }),
+    Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
+}
+
+local Options = Fluent.Options
+
+-- Combat/Silent Aim Variables
+local combatConfig = {
+    botaoVisivel = false,
+    botaoArrastavel = false,
+    guardarArma = false,
+    velocidadeBala = 500,
+    gravidade = 196.2
+}
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+local botaoTela = nil
+
+-- Player Script Variables
+local jogador = game.Players.LocalPlayer
+local rs = game:GetService("RunService")
+local MINHA_VELOCIDADE = 16 
+local MEU_PULO = 50 
+local loopConexao = nil
+local scriptAtivo = false
+
+-- BOTÃO DE TOGGLE UI
+local function CriarBotaoToggleUI()
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "ToggleUIButton"
+    screenGui.ResetOnSpawn = false
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screenGui.Parent = game:GetService("CoreGui")
+    
+    -- Botão principal
+    local toggleButton = Instance.new("ImageButton")
+    toggleButton.Name = "ToggleButton"
+    toggleButton.Size = UDim2.new(0, 60, 0, 60)
+    toggleButton.Position = UDim2.new(0, 20, 0.5, -30)
+    toggleButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    toggleButton.BorderSizePixel = 0
+    toggleButton.Parent = screenGui
+    
+    -- Ícone do botão
+    local icon = Instance.new("ImageLabel")
+    icon.Name = "Icon"
+    icon.Size = UDim2.new(0.7, 0, 0.7, 0)
+    icon.Position = UDim2.new(0.15, 0, 0.15, 0)
+    icon.BackgroundTransparency = 1
+    icon.Image = "rbxassetid://7733964370"
+    icon.ImageColor3 = Color3.fromRGB(255, 255, 255)
+    icon.Parent = toggleButton
+    
+    -- Círculo ao redor (efeito roxo)
+    local outerCircle = Instance.new("Frame")
+    outerCircle.Name = "OuterCircle"
+    outerCircle.Size = UDim2.new(1.3, 0, 1.3, 0)
+    outerCircle.Position = UDim2.new(-0.15, 0, -0.15, 0)
+    outerCircle.BackgroundColor3 = Color3.fromRGB(150, 100, 200)
+    outerCircle.BackgroundTransparency = 0.7
+    outerCircle.BorderSizePixel = 0
+    outerCircle.ZIndex = 0
+    outerCircle.Parent = toggleButton
+    
+    -- Arredondar os cantos
+    local buttonCorner = Instance.new("UICorner")
+    buttonCorner.CornerRadius = UDim.new(1, 0)
+    buttonCorner.Parent = toggleButton
+    
+    local circleCorner = Instance.new("UICorner")
+    circleCorner.CornerRadius = UDim.new(1, 0)
+    circleCorner.Parent = outerCircle
+    
+    -- Stroke/borda
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(150, 100, 200)
+    stroke.Thickness = 2
+    stroke.Parent = toggleButton
+    
+    -- Variável para controlar estado da UI
+    local uiVisible = true
+    
+    -- Função de toggle
+    toggleButton.MouseButton1Click:Connect(function()
+        uiVisible = not uiVisible
+        Window:Toggle()
+        
+        -- Animação de feedback
+        local originalSize = toggleButton.Size
+        toggleButton:TweenSize(
+            UDim2.new(0, 55, 0, 55),
+            Enum.EasingDirection.Out,
+            Enum.EasingStyle.Quad,
+            0.1,
+            true,
+            function()
+                toggleButton:TweenSize(
+                    originalSize,
+                    Enum.EasingDirection.Out,
+                    Enum.EasingStyle.Quad,
+                    0.1,
+                    true
+                )
+            end
+        )
+        
+        -- Notificação
+        Fluent:Notify({
+            Title = "Toggle UI",
+            Content = uiVisible and "Interface mostrada!" or "Interface ocultada!",
+            Duration = 2
+        })
+    end)
+    
+    -- Sistema de arrastar
+    local dragging = false
+    local dragInput, mousePos, framePos
+    
+    toggleButton.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            mousePos = input.Position
+            framePos = toggleButton.Position
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    
+    toggleButton.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - mousePos
+            toggleButton.Position = UDim2.new(
+                framePos.X.Scale,
+                framePos.X.Offset + delta.X,
+                framePos.Y.Scale,
+                framePos.Y.Offset + delta.Y
+            )
+        end
+    end)
+    
+    return screenGui
+end
+
+-- Combat Functions
+local function EquiparArma()
+    local char = LocalPlayer.Character
+    if not char then return false end
+    
+    local gun = LocalPlayer.Backpack:FindFirstChild("Gun")
+    if gun then
+        local humanoid = char:FindFirstChild("Humanoid")
+        if humanoid then
+            humanoid:EquipTool(gun)
+            task.wait(0.05)
+            return true
+        end
+    end
+    return false
+end
+
+local function GuardarArma()
+    local char = LocalPlayer.Character
+    if not char then return end
+    
+    local humanoid = char:FindFirstChild("Humanoid")
+    if humanoid then
+        humanoid:UnequipTools()
+    end
+end
+
+local function AcharMurder()
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character then
+            local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+            if hrp and (player.Character:FindFirstChild("Knife") or player.Backpack:FindFirstChild("Knife")) then
+                return hrp
+            end
+        end
+    end
+    return nil
+end
+
+local function ExecutarSilentAim()
+    local char = LocalPlayer.Character
+    local gun = char and char:FindFirstChild("Gun")
+    
+    if not gun then
+        if not EquiparArma() then return end
+        gun = char:FindFirstChild("Gun")
+    end
+    
+    local alvo = AcharMurder()
+    local evento = gun and gun:FindFirstChild("Shoot")
+    
+    if not (alvo and evento) then return end
+    
+    local alvoVel = alvo.Velocity
+    local alvoPos = alvo.Position
+    local minhaPos = char.Head.Position
+    local distancia = (alvoPos - minhaPos).Magnitude
+    local tempoViagem = distancia / combatConfig.velocidadeBala
+    
+    local predicao = alvoPos + (alvoVel * tempoViagem)
+    predicao = predicao + Vector3.new(0, -0.5 * combatConfig.gravidade * (tempoViagem ^ 2), 0)
+    
+    evento:FireServer(CFrame.new(minhaPos, predicao), CFrame.new(predicao))
+    
+    if combatConfig.guardarArma then
+        task.wait(0.03)
+        GuardarArma()
+    end
+end
+
+local function CriarBotaoTela()
+    if botaoTela then return end
+    
+    local sg = Instance.new("ScreenGui")
+    sg.Name = "SilentAimButton"
+    sg.ResetOnSpawn = false
+    sg.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    
+    local btn = Instance.new("TextButton")
+    btn.Name = "ShootButton"
+    btn.Size = UDim2.new(0, 80, 0, 80)
+    btn.Position = UDim2.new(0.85, 0, 0.5, 0)
+    btn.BackgroundColor3 = Color3.fromRGB(220, 50, 50)
+    btn.Text = "🎯"
+    btn.TextSize = 35
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.GothamBold
+    btn.Parent = sg
+    
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 15)
+    corner.Parent = btn
+    
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(0, 0, 0)
+    stroke.Thickness = 3
+    stroke.Parent = btn
+    
+    btn.MouseButton1Click:Connect(ExecutarSilentAim)
+    
+    local dragging, dragInput, mousePos, framePos = false, nil, nil, nil
+    
+    btn.InputBegan:Connect(function(input)
+        if combatConfig.botaoArrastavel and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+            dragging = true
+            mousePos = input.Position
+            framePos = btn.Position
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    
+    btn.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            local delta = input.Position - mousePos
+            btn.Position = UDim2.new(framePos.X.Scale, framePos.X.Offset + delta.X, framePos.Y.Scale, framePos.Y.Offset + delta.Y)
+        end
+    end)
+    
+    sg.Parent = game:GetService("CoreGui")
+    botaoTela = sg
+end
+
+local function RemoverBotaoTela()
+    if botaoTela then
+        botaoTela:Destroy()
+        botaoTela = nil
+    end
+end
+
+-- Player Functions
+local function manterStatus()
+    local char = jogador.Character
+    local humanoide = char and char:FindFirstChild("Humanoid")
+    
+    if humanoide then
+        if humanoide.WalkSpeed ~= MINHA_VELOCIDADE then
+            humanoide.WalkSpeed = MINHA_VELOCIDADE
+        end
+        
+        humanoide.UseJumpPower = true
+        if humanoide.JumpPower ~= MEU_PULO then
+            humanoide.JumpPower = MEU_PULO
+        end
+    end
+end
+
+local function ativarLoop()
+    if loopConexao then loopConexao:Disconnect() end
+    loopConexao = rs.Heartbeat:Connect(manterStatus)
+end
+
+local function desativarLoop()
+    if loopConexao then 
+        loopConexao:Disconnect() 
+        loopConexao = nil
+    end
+end
+
+jogador.CharacterAdded:Connect(function()
+    if scriptAtivo then
+        ativarLoop()
+    end
+end)
+
+do
+    -- CRIAR BOTÃO DE TOGGLE UI
+    CriarBotaoToggleUI()
+    
+    Fluent:Notify({
+        Title = "Sun Hub",
+        Content = "Welcome to Sun Hub!",
+        SubContent = "Script loaded successfully",
+        Duration = 5
+    })
+    
+    -- Combat Tab
+    Tabs.Combat:AddParagraph({
+        Title = "Silent Aim",
+        Content = "O script equipa a arma automaticamente. Use o botão de tela ou a tecla configurada para atirar no Murderer com precisão."
+    })
+    
+    Tabs.Combat:AddToggle("ToggleBotao", {
+        Title = "Mostrar Botão de Tela",
+        Default = false,
+        Callback = function(v)
+            combatConfig.botaoVisivel = v
+            if v then 
+                CriarBotaoTela()
+                Fluent:Notify({
+                    Title = "Combat",
+                    Content = "Botão de tela ativado!",
+                    Duration = 3
+                })
+            else 
+                RemoverBotaoTela()
+                Fluent:Notify({
+                    Title = "Combat",
+                    Content = "Botão de tela desativado!",
+                    Duration = 3
+                })
+            end
+        end
+    })
+    
+    Tabs.Combat:AddToggle("ToggleArrastar", {
+        Title = "Permitir Arrastar Botão",
+        Default = false,
+        Callback = function(v)
+            combatConfig.botaoArrastavel = v
+        end
+    })
+    
+    Tabs.Combat:AddToggle("ToggleGuardar", {
+        Title = "Guardar Arma Após Atirar",
+        Default = false,
+        Callback = function(v)
+            combatConfig.guardarArma = v
+        end
+    })
+    
+    Tabs.Combat:AddKeybind("SilentKeybind", {
+        Title = "Tecla de Atalho",
+        Mode = "Toggle",
+        Default = "Q",
+        Callback = ExecutarSilentAim
+    })
+    
+    local BulletSpeedSlider = Tabs.Combat:AddSlider("BulletSpeed", {
+        Title = "Velocidade da Bala",
+        Description = "Ajuste a velocidade para melhor precisão",
+        Default = 500,
+        Min = 100,
+        Max = 1000,
+        Rounding = 0,
+        Callback = function(Value)
+            combatConfig.velocidadeBala = Value
+        end
+    })
+    
+    local GravitySlider = Tabs.Combat:AddSlider("Gravity", {
+        Title = "Gravidade",
+        Description = "Ajuste a compensação de gravidade",
+        Default = 196.2,
+        Min = 0,
+        Max = 400,
+        Rounding = 1,
+        Callback = function(Value)
+            combatConfig.gravidade = Value
+        end
+    })
+    
+    -- Player Tab
+    Tabs.Player:AddParagraph({
+        Title = "Movement Settings",
+        Content = "Customize your character's movement speed and jump power."
+    })
+    
+    local WalkSpeedSlider = Tabs.Player:AddSlider("WalkSpeed", {
+        Title = "Walk Speed",
+        Description = "Adjust your walking speed",
+        Default = 16,
+        Min = 16,
+        Max = 200,
+        Rounding = 0,
+        Callback = function(Value)
+            MINHA_VELOCIDADE = Value
+        end
+    })
+    
+    local JumpPowerSlider = Tabs.Player:AddSlider("JumpPower", {
+        Title = "Jump Power",
+        Description = "Adjust your jump power",
+        Default = 50,
+        Min = 50,
+        Max = 300,
+        Rounding = 0,
+        Callback = function(Value)
+            MEU_PULO = Value
+        end
+    })
+    
+    local ToggleMovement = Tabs.Player:AddToggle("ToggleMovement", {
+        Title = "Enable Movement Modifier",
+        Default = false
+    })
+    
+    ToggleMovement:OnChanged(function()
+        scriptAtivo = Options.ToggleMovement.Value
+        if scriptAtivo then
+            ativarLoop()
+            Fluent:Notify({
+                Title = "Movement Modifier",
+                Content = "Movement modifier enabled!",
+                Duration = 3
+            })
+        else
+            desativarLoop()
+            Fluent:Notify({
+                Title = "Movement Modifier",
+                Content = "Movement modifier disabled!",
+                Duration = 3
+            })
+        end
+    end)
+    
+    -- Teleport Tab
+    Tabs.Teleport:AddParagraph({
+        Title = "Teleport Options",
+        Content = "Quick teleport to different locations and players in MM2."
+    })
+    
+    Tabs.Teleport:AddButton({
+        Title = "Teleport to Lobby",
+        Description = "Teleport back to the lobby/spawn area",
+        Callback = function()
+            local ALVO_POS = Vector3.new(14.27564525604248, 504.818115234375, -45.334800720214844)
+            local personagem = LocalPlayer.Character
+            local root = personagem and personagem:FindFirstChild("HumanoidRootPart")
+            
+            if root then
+                root.Velocity = Vector3.new(0, 0, 0)
+                root.CFrame = CFrame.new(ALVO_POS + Vector3.new(0, 3, 0))
+                Fluent:Notify({
+                    Title = "Teleport",
+                    Content = "Teleported to Lobby!",
+                    Duration = 3
+                })
+            else
+                Fluent:Notify({
+                    Title = "Teleport",
+                    Content = "Character not found!",
+                    Duration = 3
+                })
+            end
+        end
+    })
+    
+    Tabs.Teleport:AddButton({
+        Title = "Teleport to Murder",
+        Description = "Teleport to the murderer",
+        Callback = function()
+            local target = nil
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Character then
+                    if p.Character:FindFirstChild("Knife") or p.Backpack:FindFirstChild("Knife") then
+                        target = p.Character:FindFirstChild("HumanoidRootPart")
+                        break
+                    end
+                end
+            end
+
+            local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if myRoot and target then
+                myRoot.CFrame = target.CFrame * CFrame.new(0, 0, 3)
+                Fluent:Notify({
+                    Title = "Teleport",
+                    Content = "Teleported to Murder!",
+                    Duration = 3
+                })
+            else
+                Fluent:Notify({
+                    Title = "Teleport",
+                    Content = "Murder not found!",
+                    Duration = 3
+                })
+            end
+        end
+    })
+    
+    Tabs.Teleport:AddButton({
+        Title = "Teleport to Sheriff",
+        Description = "Teleport to the sheriff",
+        Callback = function()
+            local target = nil
+            for _, p in pairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and p.Character then
+                    if p.Character:FindFirstChild("Gun") or p.Backpack:FindFirstChild("Gun") then
+                        target = p.Character:FindFirstChild("HumanoidRootPart")
+                        break
+                    end
+                end
+            end
+
+            local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if myRoot and target then
+                myRoot.CFrame = target.CFrame * CFrame.new(0, 0, 3)
+                Fluent:Notify({
+                    Title = "Teleport",
+                    Content = "Teleported to Sheriff!",
+                    Duration = 3
+                })
+            else
+                Fluent:Notify({
+                    Title = "Teleport",
+                    Content = "Sheriff not found!",
+                    Duration = 3
+                })
+            end
+        end
+    })
+    
+    local playersList = {}
+    local function RefreshPlayers()
+        playersList = {}
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                table.insert(playersList, player.Name)
+            end
+        end
+        return playersList
+    end
+    
+    RefreshPlayers()
+    
+    local PlayerDropdown = Tabs.Teleport:AddDropdown("PlayerDropdown", {
+        Title = "Select Player",
+        Values = playersList,
+        Multi = false,
+        Default = 1,
+    })
+    
+    Tabs.Teleport:AddButton({
+        Title = "Refresh Players",
+        Description = "Update the player list",
+        Callback = function()
+            local newList = RefreshPlayers()
+            PlayerDropdown:SetValues(newList)
+            Fluent:Notify({
+                Title = "Players",
+                Content = "Player list refreshed!",
+                Duration = 3
+            })
+        end
+    })
+    
+    Tabs.Teleport:AddButton({
+        Title = "Teleport to Selected Player",
+        Description = "Teleport to the selected player",
+        Callback = function()
+            local selectedPlayer = Options.PlayerDropdown.Value
+            if selectedPlayer then
+                local targetPlayer = Players:FindFirstChild(selectedPlayer)
+                
+                if targetPlayer and targetPlayer.Character then
+                    local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    
+                    if myRoot a
