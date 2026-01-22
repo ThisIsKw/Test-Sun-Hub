@@ -16,7 +16,7 @@ local Tabs = {
     Combat = Window:AddTab({ Title = "Combat", Icon = "crosshair" }),
     Player = Window:AddTab({ Title = "Player", Icon = "user" }),
     Teleport = Window:AddTab({ Title = "Teleport", Icon = "map-pin" }),
-    AutoFarm = Window:AddTab({ Title = "Auto Farm", Icon = "zap" }),
+    AutoFarm = Window:AddTab({ Title = "Auto Farm", Icon = "gamepad-2" }),
     Settings = Window:AddTab({ Title = "Settings", Icon = "settings" })
 }
 
@@ -24,28 +24,28 @@ local Options = Fluent.Options
 
 -- Combat/Silent Aim Variables
 local combatConfig = {
-    botaoVisivel = false,
-    botaoArrastavel = false,
-    guardarArma = false,
-    velocidadeBala = 500,
-    gravidade = 196.2
+    showButton = false,
+    draggableButton = false,
+    holsterWeapon = false,
+    bulletSpeed = 500,
+    gravity = 196.2
 }
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
-local botaoTela = nil
+local screenButton = nil
 
 -- Player Script Variables
-local jogador = game.Players.LocalPlayer
+local player = game.Players.LocalPlayer
 local rs = game:GetService("RunService")
-local MINHA_VELOCIDADE = 16 
-local MEU_PULO = 50 
-local loopConexao = nil
-local scriptAtivo = false
+local MY_SPEED = 16 
+local MY_JUMP = 50 
+local loopConnection = nil
+local scriptActive = false
 
 -- Combat Functions
-local function EquiparArma()
+local function EquipWeapon()
     local char = LocalPlayer.Character
     if not char then return false end
     
@@ -61,7 +61,7 @@ local function EquiparArma()
     return false
 end
 
-local function GuardarArma()
+local function HolsterWeapon()
     local char = LocalPlayer.Character
     if not char then return end
     
@@ -71,7 +71,7 @@ local function GuardarArma()
     end
 end
 
-local function AcharMurder()
+local function FindMurder()
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
             local hrp = player.Character:FindFirstChild("HumanoidRootPart")
@@ -83,39 +83,39 @@ local function AcharMurder()
     return nil
 end
 
-local function ExecutarSilentAim()
+local function ExecuteSilentAim()
     local char = LocalPlayer.Character
     local gun = char and char:FindFirstChild("Gun")
     
     if not gun then
-        if not EquiparArma() then return end
+        if not EquipWeapon() then return end
         gun = char:FindFirstChild("Gun")
     end
     
-    local alvo = AcharMurder()
-    local evento = gun and gun:FindFirstChild("Shoot")
+    local target = FindMurder()
+    local event = gun and gun:FindFirstChild("Shoot")
     
-    if not (alvo and evento) then return end
+    if not (target and event) then return end
     
-    local alvoVel = alvo.Velocity
-    local alvoPos = alvo.Position
-    local minhaPos = char.Head.Position
-    local distancia = (alvoPos - minhaPos).Magnitude
-    local tempoViagem = distancia / combatConfig.velocidadeBala
+    local targetVel = target.Velocity
+    local targetPos = target.Position
+    local myPos = char.Head.Position
+    local distance = (targetPos - myPos).Magnitude
+    local travelTime = distance / combatConfig.bulletSpeed
     
-    local predicao = alvoPos + (alvoVel * tempoViagem)
-    predicao = predicao + Vector3.new(0, -0.5 * combatConfig.gravidade * (tempoViagem ^ 2), 0)
+    local prediction = targetPos + (targetVel * travelTime)
+    prediction = prediction + Vector3.new(0, -0.5 * combatConfig.gravity * (travelTime ^ 2), 0)
     
-    evento:FireServer(CFrame.new(minhaPos, predicao), CFrame.new(predicao))
+    event:FireServer(CFrame.new(myPos, prediction), CFrame.new(prediction))
     
-    if combatConfig.guardarArma then
+    if combatConfig.holsterWeapon then
         task.wait(0.03)
-        GuardarArma()
+        HolsterWeapon()
     end
 end
 
-local function CriarBotaoTela()
-    if botaoTela then return end
+local function CreateScreenButton()
+    if screenButton then return end
     
     local sg = Instance.new("ScreenGui")
     sg.Name = "SilentAimButton"
@@ -142,12 +142,12 @@ local function CriarBotaoTela()
     stroke.Thickness = 3
     stroke.Parent = btn
     
-    btn.MouseButton1Click:Connect(ExecutarSilentAim)
+    btn.MouseButton1Click:Connect(ExecuteSilentAim)
     
     local dragging, dragInput, mousePos, framePos = false, nil, nil, nil
     
     btn.InputBegan:Connect(function(input)
-        if combatConfig.botaoArrastavel and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+        if combatConfig.draggableButton and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
             dragging = true
             mousePos = input.Position
             framePos = btn.Position
@@ -174,64 +174,53 @@ local function CriarBotaoTela()
     end)
     
     sg.Parent = game:GetService("CoreGui")
-    botaoTela = sg
+    screenButton = sg
 end
 
-local function RemoverBotaoTela()
-    if botaoTela then
-        botaoTela:Destroy()
-        botaoTela = nil
+local function RemoveScreenButton()
+    if screenButton then
+        screenButton:Destroy()
+        screenButton = nil
     end
 end
 
 -- Player Functions
-local function manterStatus()
-    local char = jogador.Character
-    local humanoide = char and char:FindFirstChild("Humanoid")
+local function maintainStats()
+    local char = player.Character
+    local humanoid = char and char:FindFirstChild("Humanoid")
     
-    if humanoide then
-        if humanoide.WalkSpeed ~= MINHA_VELOCIDADE then
-            humanoide.WalkSpeed = MINHA_VELOCIDADE
+    if humanoid then
+        if humanoid.WalkSpeed ~= MY_SPEED then
+            humanoid.WalkSpeed = MY_SPEED
         end
         
-        humanoide.UseJumpPower = true
-        if humanoide.JumpPower ~= MEU_PULO then
-            humanoide.JumpPower = MEU_PULO
+        humanoid.UseJumpPower = true
+        if humanoid.JumpPower ~= MY_JUMP then
+            humanoid.JumpPower = MY_JUMP
         end
     end
 end
 
-local function ativarLoop()
-    if loopConexao then loopConexao:Disconnect() end
-    loopConexao = rs.Heartbeat:Connect(manterStatus)
+local function activateLoop()
+    if loopConnection then loopConnection:Disconnect() end
+    loopConnection = rs.Heartbeat:Connect(maintainStats)
 end
 
-local function desativarLoop()
-    if loopConexao then 
-        loopConexao:Disconnect() 
-        loopConexao = nil
+local function deactivateLoop()
+    if loopConnection then 
+        loopConnection:Disconnect() 
+        loopConnection = nil
     end
 end
 
-jogador.CharacterAdded:Connect(function()
-    if scriptAtivo then
-        ativarLoop()
+player.CharacterAdded:Connect(function()
+    if scriptActive then
+        activateLoop()
     end
 end)
 
--- UI Toggle Function
-local function ToggleUI(visible)
-    if Window then
-        Window.Enabled = visible
-        Fluent:Notify({
-            Title = "Sun Hub",
-            Content = visible and "UI Mostrada!" or "UI Ocultada!",
-            Duration = 2
-        })
-    end
-end
-
 do
+    -- Initial welcome notification
     Fluent:Notify({
         Title = "Sun Hub",
         Content = "Welcome to Sun Hub!",
@@ -242,76 +231,66 @@ do
     -- Combat Tab
     Tabs.Combat:AddParagraph({
         Title = "Silent Aim",
-        Content = "O script equipa a arma automaticamente. Use o botão de tela ou a tecla configurada para atirar no Murderer com precisão."
+        Content = "The script automatically equips the weapon. Use the screen button or configured key to shoot the Murderer with precision."
     })
     
-    Tabs.Combat:AddToggle("ToggleBotao", {
-        Title = "Mostrar Botão de Tela",
+    Tabs.Combat:AddToggle("ToggleButton", {
+        Title = "Show Screen Button",
         Default = false,
         Callback = function(v)
-            combatConfig.botaoVisivel = v
+            combatConfig.showButton = v
             if v then 
-                CriarBotaoTela()
-                Fluent:Notify({
-                    Title = "Combat",
-                    Content = "Botão de tela ativado!",
-                    Duration = 3
-                })
+                CreateScreenButton()
             else 
-                RemoverBotaoTela()
-                Fluent:Notify({
-                    Title = "Combat",
-                    Content = "Botão de tela desativado!",
-                    Duration = 3
-                })
+                RemoveScreenButton()
             end
         end
     })
     
-    Tabs.Combat:AddToggle("ToggleArrastar", {
-        Title = "Permitir Arrastar Botão",
+    Tabs.Combat:AddToggle("ToggleDrag", {
+        Title = "Allow Dragging Button",
         Default = false,
         Callback = function(v)
-            combatConfig.botaoArrastavel = v
+            combatConfig.draggableButton = v
         end
     })
     
-    Tabs.Combat:AddToggle("ToggleGuardar", {
-        Title = "Guardar Arma Após Atirar",
+    Tabs.Combat:AddToggle("ToggleHolster", {
+        Title = "Holster Weapon After Shooting",
         Default = false,
         Callback = function(v)
-            combatConfig.guardarArma = v
+            combatConfig.holsterWeapon = v
         end
     })
     
     Tabs.Combat:AddKeybind("SilentKeybind", {
-        Title = "Tecla de Atalho",
+        Title = "Hotkey",
         Mode = "Toggle",
         Default = "Q",
-        Callback = ExecutarSilentAim
+        Callback = ExecuteSilentAim
     })
     
     local BulletSpeedSlider = Tabs.Combat:AddSlider("BulletSpeed", {
-        Title = "Velocidade da Bala",
-        Description = "Ajuste a velocidade para melhor precisão",
+        Title = "Bullet Speed",
+        Description = "Adjust speed for better accuracy",
         Default = 500,
         Min = 100,
         Max = 1000,
         Rounding = 0,
         Callback = function(Value)
-            combatConfig.velocidadeBala = Value
+            combatConfig.bulletSpeed = Value
         end
     })
     
     local GravitySlider = Tabs.Combat:AddSlider("Gravity", {
-        Title = "Gravidade",
-        Description = "Ajuste a compensação de gravidade",
+        Title = "Gravity",
+        Description = "Adjust gravity compensation",
         Default = 196.2,
         Min = 0,
         Max = 400,
         Rounding = 1,
         Callback = function(Value)
-            combatConfig.gravidade = Value
+            combatConfig.gravity = Value
         end
     })
     
@@ -329,7 +308,7 @@ do
         Max = 200,
         Rounding = 0,
         Callback = function(Value)
-            MINHA_VELOCIDADE = Value
+            MY_SPEED = Value
         end
     })
     
@@ -341,7 +320,7 @@ do
         Max = 300,
         Rounding = 0,
         Callback = function(Value)
-            MEU_PULO = Value
+            MY_JUMP = Value
         end
     })
     
@@ -351,21 +330,11 @@ do
     })
     
     ToggleMovement:OnChanged(function()
-        scriptAtivo = Options.ToggleMovement.Value
-        if scriptAtivo then
-            ativarLoop()
-            Fluent:Notify({
-                Title = "Movement Modifier",
-                Content = "Movement modifier enabled!",
-                Duration = 3
-            })
+        scriptActive = Options.ToggleMovement.Value
+        if scriptActive then
+            activateLoop()
         else
-            desativarLoop()
-            Fluent:Notify({
-                Title = "Movement Modifier",
-                Content = "Movement modifier disabled!",
-                Duration = 3
-            })
+            deactivateLoop()
         end
     end)
     
@@ -379,18 +348,13 @@ do
         Title = "Teleport to Lobby",
         Description = "Teleport back to the lobby/spawn area",
         Callback = function()
-            local ALVO_POS = Vector3.new(14.27564525604248, 504.818115234375, -45.334800720214844)
-            local personagem = LocalPlayer.Character
-            local root = personagem and personagem:FindFirstChild("HumanoidRootPart")
+            local TARGET_POS = Vector3.new(14.27564525604248, 504.818115234375, -45.334800720214844)
+            local character = LocalPlayer.Character
+            local root = character and character:FindFirstChild("HumanoidRootPart")
             
             if root then
                 root.Velocity = Vector3.new(0, 0, 0)
-                root.CFrame = CFrame.new(ALVO_POS + Vector3.new(0, 3, 0))
-                Fluent:Notify({
-                    Title = "Teleport",
-                    Content = "Teleported to Lobby!",
-                    Duration = 3
-                })
+                root.CFrame = CFrame.new(TARGET_POS + Vector3.new(0, 3, 0))
             else
                 Fluent:Notify({
                     Title = "Teleport",
@@ -418,11 +382,6 @@ do
             local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
             if myRoot and target then
                 myRoot.CFrame = target.CFrame * CFrame.new(0, 0, 3)
-                Fluent:Notify({
-                    Title = "Teleport",
-                    Content = "Teleported to Murder!",
-                    Duration = 3
-                })
             else
                 Fluent:Notify({
                     Title = "Teleport",
@@ -450,11 +409,6 @@ do
             local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
             if myRoot and target then
                 myRoot.CFrame = target.CFrame * CFrame.new(0, 0, 3)
-                Fluent:Notify({
-                    Title = "Teleport",
-                    Content = "Teleported to Sheriff!",
-                    Duration = 3
-                })
             else
                 Fluent:Notify({
                     Title = "Teleport",
@@ -491,11 +445,6 @@ do
         Callback = function()
             local newList = RefreshPlayers()
             PlayerDropdown:SetValues(newList)
-            Fluent:Notify({
-                Title = "Players",
-                Content = "Player list refreshed!",
-                Duration = 3
-            })
         end
     })
     
@@ -513,11 +462,6 @@ do
                     
                     if myRoot and targetRoot then
                         myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 3)
-                        Fluent:Notify({
-                            Title = "Teleport",
-                            Content = "Teleported to " .. selectedPlayer .. "!",
-                            Duration = 3
-                        })
                     end
                 end
             else
@@ -536,8 +480,8 @@ do
         Content = "Anti-AFK system to keep you active in the game."
     })
     
-    local antiAFKAtivo = false
-    local antiAFKConexao = nil
+    local antiAFKActive = false
+    local antiAFKConnection = nil
     
     local ToggleAntiAFK = Tabs.AutoFarm:AddToggle("ToggleAntiAFK", {
         Title = "Anti-AFK",
@@ -545,60 +489,22 @@ do
     })
     
     ToggleAntiAFK:OnChanged(function()
-        antiAFKAtivo = Options.ToggleAntiAFK.Value
+        antiAFKActive = Options.ToggleAntiAFK.Value
         
-        if antiAFKAtivo then
+        if antiAFKActive then
             local VU = game:GetService("VirtualUser")
             
-            antiAFKConexao = LocalPlayer.Idled:Connect(function()
+            antiAFKConnection = LocalPlayer.Idled:Connect(function()
                 VU:CaptureController()
                 VU:ClickButton2(Vector2.new())
             end)
-            
-            Fluent:Notify({
-                Title = "Anti-AFK",
-                Content = "Anti-AFK enabled! You won't be kicked for inactivity.",
-                Duration = 3
-            })
         else
-            if antiAFKConexao then
-                antiAFKConexao:Disconnect()
-                antiAFKConexao = nil
+            if antiAFKConnection then
+                antiAFKConnection:Disconnect()
+                antiAFKConnection = nil
             end
-            
-            Fluent:Notify({
-                Title = "Anti-AFK",
-                Content = "Anti-AFK disabled!",
-                Duration = 3
-            })
         end
     end)
-
-    -- Settings Tab - UI Toggle
-    Tabs.Settings:AddParagraph({
-        Title = "UI Controls",
-        Content = "Control the visibility of the Sun Hub interface."
-    })
-    
-    Tabs.Settings:AddToggle("ToggleUI", {
-        Title = "Show/Hide UI",
-        Default = true,
-        Callback = function(value)
-            ToggleUI(value)
-        end
-    })
-    
-    Tabs.Settings:AddKeybind("UIKeybind", {
-        Title = "UI Toggle Keybind",
-        Mode = "Toggle",
-        Default = "RightShift",
-        Callback = function()
-            local currentState = Options.ToggleUI.Value
-            Options.ToggleUI:SetValue(not currentState)
-        end
-    })
-    
-    Tabs.Settings:AddDivider()
 end
 
 SaveManager:SetLibrary(Fluent)
@@ -622,4 +528,3 @@ Fluent:Notify({
 })
 
 SaveManager:LoadAutoloadConfig()
-[file content end]
