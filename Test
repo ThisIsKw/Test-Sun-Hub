@@ -44,133 +44,6 @@ local MEU_PULO = 50
 local loopConexao = nil
 local scriptAtivo = false
 
--- BOTÃO DE TOGGLE UI
-local function CriarBotaoToggleUI()
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "ToggleUIButton"
-    screenGui.ResetOnSpawn = false
-    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    screenGui.Parent = game:GetService("CoreGui")
-    
-    -- Botão principal
-    local toggleButton = Instance.new("ImageButton")
-    toggleButton.Name = "ToggleButton"
-    toggleButton.Size = UDim2.new(0, 60, 0, 60)
-    toggleButton.Position = UDim2.new(0, 20, 0.5, -30)
-    toggleButton.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-    toggleButton.BorderSizePixel = 0
-    toggleButton.Parent = screenGui
-    
-    -- Ícone do botão
-    local icon = Instance.new("ImageLabel")
-    icon.Name = "Icon"
-    icon.Size = UDim2.new(0.7, 0, 0.7, 0)
-    icon.Position = UDim2.new(0.15, 0, 0.15, 0)
-    icon.BackgroundTransparency = 1
-    icon.Image = "rbxassetid://7733964370"
-    icon.ImageColor3 = Color3.fromRGB(255, 255, 255)
-    icon.Parent = toggleButton
-    
-    -- Círculo ao redor (efeito roxo)
-    local outerCircle = Instance.new("Frame")
-    outerCircle.Name = "OuterCircle"
-    outerCircle.Size = UDim2.new(1.3, 0, 1.3, 0)
-    outerCircle.Position = UDim2.new(-0.15, 0, -0.15, 0)
-    outerCircle.BackgroundColor3 = Color3.fromRGB(150, 100, 200)
-    outerCircle.BackgroundTransparency = 0.7
-    outerCircle.BorderSizePixel = 0
-    outerCircle.ZIndex = 0
-    outerCircle.Parent = toggleButton
-    
-    -- Arredondar os cantos
-    local buttonCorner = Instance.new("UICorner")
-    buttonCorner.CornerRadius = UDim.new(1, 0)
-    buttonCorner.Parent = toggleButton
-    
-    local circleCorner = Instance.new("UICorner")
-    circleCorner.CornerRadius = UDim.new(1, 0)
-    circleCorner.Parent = outerCircle
-    
-    -- Stroke/borda
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(150, 100, 200)
-    stroke.Thickness = 2
-    stroke.Parent = toggleButton
-    
-    -- Variável para controlar estado da UI
-    local uiVisible = true
-    
-    -- Função de toggle
-    toggleButton.MouseButton1Click:Connect(function()
-        uiVisible = not uiVisible
-        Window:Toggle()
-        
-        -- Animação de feedback
-        local originalSize = toggleButton.Size
-        toggleButton:TweenSize(
-            UDim2.new(0, 55, 0, 55),
-            Enum.EasingDirection.Out,
-            Enum.EasingStyle.Quad,
-            0.1,
-            true,
-            function()
-                toggleButton:TweenSize(
-                    originalSize,
-                    Enum.EasingDirection.Out,
-                    Enum.EasingStyle.Quad,
-                    0.1,
-                    true
-                )
-            end
-        )
-        
-        -- Notificação
-        Fluent:Notify({
-            Title = "Toggle UI",
-            Content = uiVisible and "Interface mostrada!" or "Interface ocultada!",
-            Duration = 2
-        })
-    end)
-    
-    -- Sistema de arrastar
-    local dragging = false
-    local dragInput, mousePos, framePos
-    
-    toggleButton.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            mousePos = input.Position
-            framePos = toggleButton.Position
-            
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
-                end
-            end)
-        end
-    end)
-    
-    toggleButton.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-        end
-    end)
-    
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - mousePos
-            toggleButton.Position = UDim2.new(
-                framePos.X.Scale,
-                framePos.X.Offset + delta.X,
-                framePos.Y.Scale,
-                framePos.Y.Offset + delta.Y
-            )
-        end
-    end)
-    
-    return screenGui
-end
-
 -- Combat Functions
 local function EquiparArma()
     local char = LocalPlayer.Character
@@ -346,10 +219,19 @@ jogador.CharacterAdded:Connect(function()
     end
 end)
 
+-- UI Toggle Function
+local function ToggleUI(visible)
+    if Window then
+        Window.Enabled = visible
+        Fluent:Notify({
+            Title = "Sun Hub",
+            Content = visible and "UI Mostrada!" or "UI Ocultada!",
+            Duration = 2
+        })
+    end
+end
+
 do
-    -- CRIAR BOTÃO DE TOGGLE UI
-    CriarBotaoToggleUI()
-    
     Fluent:Notify({
         Title = "Sun Hub",
         Content = "Welcome to Sun Hub!",
@@ -629,4 +511,115 @@ do
                     local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                     local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
                     
-                    if myRoot a
+                    if myRoot and targetRoot then
+                        myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 3)
+                        Fluent:Notify({
+                            Title = "Teleport",
+                            Content = "Teleported to " .. selectedPlayer .. "!",
+                            Duration = 3
+                        })
+                    end
+                end
+            else
+                Fluent:Notify({
+                    Title = "Teleport",
+                    Content = "Please select a player first!",
+                    Duration = 3
+                })
+            end
+        end
+    })
+    
+    -- Auto Farm Tab
+    Tabs.AutoFarm:AddParagraph({
+        Title = "Auto Farm Settings",
+        Content = "Anti-AFK system to keep you active in the game."
+    })
+    
+    local antiAFKAtivo = false
+    local antiAFKConexao = nil
+    
+    local ToggleAntiAFK = Tabs.AutoFarm:AddToggle("ToggleAntiAFK", {
+        Title = "Anti-AFK",
+        Default = false
+    })
+    
+    ToggleAntiAFK:OnChanged(function()
+        antiAFKAtivo = Options.ToggleAntiAFK.Value
+        
+        if antiAFKAtivo then
+            local VU = game:GetService("VirtualUser")
+            
+            antiAFKConexao = LocalPlayer.Idled:Connect(function()
+                VU:CaptureController()
+                VU:ClickButton2(Vector2.new())
+            end)
+            
+            Fluent:Notify({
+                Title = "Anti-AFK",
+                Content = "Anti-AFK enabled! You won't be kicked for inactivity.",
+                Duration = 3
+            })
+        else
+            if antiAFKConexao then
+                antiAFKConexao:Disconnect()
+                antiAFKConexao = nil
+            end
+            
+            Fluent:Notify({
+                Title = "Anti-AFK",
+                Content = "Anti-AFK disabled!",
+                Duration = 3
+            })
+        end
+    end)
+
+    -- Settings Tab - UI Toggle
+    Tabs.Settings:AddParagraph({
+        Title = "UI Controls",
+        Content = "Control the visibility of the Sun Hub interface."
+    })
+    
+    Tabs.Settings:AddToggle("ToggleUI", {
+        Title = "Show/Hide UI",
+        Default = true,
+        Callback = function(value)
+            ToggleUI(value)
+        end
+    })
+    
+    Tabs.Settings:AddKeybind("UIKeybind", {
+        Title = "UI Toggle Keybind",
+        Mode = "Toggle",
+        Default = "RightShift",
+        Callback = function()
+            local currentState = Options.ToggleUI.Value
+            Options.ToggleUI:SetValue(not currentState)
+        end
+    })
+    
+    Tabs.Settings:AddDivider()
+end
+
+SaveManager:SetLibrary(Fluent)
+InterfaceManager:SetLibrary(Fluent)
+
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({})
+
+InterfaceManager:SetFolder("FluentScriptHub")
+SaveManager:SetFolder("FluentScriptHub/specific-game")
+
+InterfaceManager:BuildInterfaceSection(Tabs.Settings)
+SaveManager:BuildConfigSection(Tabs.Settings)
+
+Window:SelectTab(1)
+
+Fluent:Notify({
+    Title = "Sun Hub",
+    Content = "Script loaded and ready to use!",
+    Duration = 8
+})
+
+SaveManager:LoadAutoloadConfig()
+[file content end]
